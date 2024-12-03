@@ -2,6 +2,7 @@ import sqlite3
 import sys
 
 from PyQt6 import uic
+from PyQt6.QtCore import QModelIndex
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem
 
 ROAST_DEGREES = {
@@ -25,6 +26,7 @@ class Coffee(QMainWindow):
 
         self.fill_in_table()
         self.add_row_btn.clicked.connect(self.init_add_form)
+        self.edit_row_btn.clicked.connect(self.init_edit_form)
 
     def fill_in_table(self):
         tb: QTableWidget = self.coffee_table
@@ -50,31 +52,68 @@ class Coffee(QMainWindow):
         tb.resizeColumnsToContents()
 
     def init_add_form(self):
-        form = AddForm(self, self.add_row)
+        form = AddEditForm(self, self.add_row)
         form.show()
 
-    def add_row(self, variety: str, roast_deg: int, shape: int, taste_description: str, price: int, value: int) -> None:
+    def init_edit_form(self):
+        tb: QTableWidget = self.coffee_table
+        selected = tb.selectedIndexes()
+        rows = set(map(QModelIndex.row, selected))
+        if len(rows) > 1:
+            self.statusBar.showMessage("Выбрано больше одной строки")
+            return
+        if not rows:
+            self.statusBar.showMessage("Ничего не выбрано")
+            return
+
+        row_index = tuple(rows)[0]
+        row_id = int(tb.item(row_index, 0).text())
+        form = AddEditForm(self, self.add_row, True, row_id)
+
         with sqlite3.connect("coffee.sqlite") as conn:
             cursor = conn.cursor()
             query = """
-            INSERT INTO coffee(variety, roast_degree, ground_bean, taste_description, price, value) VALUES
-            (?, ?, ?, ?, ?, ?);
+            SELECT variety, roast_degree, ground_bean, taste_description, price, value
+            FROM coffee
+            WHERE id = ?;
             """
+            form.fill_in_data(*cursor.execute(query, (row_id,)).fetchone())
+
+        form.show()
+
+    def add_row(self, variety: str, roast_deg: int, shape: int, taste_description: str, price: int, value: int,
+                edit_mode: bool, row_id: int | None) -> None:
+        with sqlite3.connect("coffee.sqlite") as conn:
+            cursor = conn.cursor()
+            if edit_mode:
+                query = f"""
+                UPDATE coffee
+                SET variety = ?, roast_degree = ?, ground_bean = ?, taste_description = ?, price = ?, value = ?
+                WHERE id = {row_id};
+                """
+            else:
+                query = """
+                INSERT INTO coffee(variety, roast_degree, ground_bean, taste_description, price, value) VALUES
+                (?, ?, ?, ?, ?, ?);
+                """
             cursor.execute(query,
                            (variety, roast_deg, shape, taste_description, price, value))
             conn.commit()
 
 
-class AddForm(QMainWindow):
-    def __init__(self, parent: Coffee, callback: ()):
+class AddEditForm(QMainWindow):
+    def __init__(self, parent: Coffee, callback: (), edit_mode: bool = False, row_id: int = None):
         super().__init__(parent)
         with open("addEditCoffeeForm.ui") as f:
             uic.loadUi(f, self)
 
-        self.callback = callback
-        self.submit_btn.clicked.connect(self.add_row)
+        self.row_id = row_id
+        self.edit_mode = edit_mode
 
-    def add_row(self):
+        self.callback = callback
+        self.submit_btn.clicked.connect(self.add_edit_row)
+
+    def add_edit_row(self):
         variety = self.variety.text().strip()
         roast_degree = self.roast_degree.currentIndex() + 1
         shape = self.shape.currentIndex()
@@ -89,7 +128,7 @@ class AddForm(QMainWindow):
         price = int(price)
         value = int(value)
 
-        self.callback(variety, roast_degree, shape, taste_description, price, value)
+        self.callback(variety, roast_degree, shape, taste_description, price, value, self.edit_mode, self.row_id)
         self.parent().fill_in_table()
         self.close()
 
@@ -103,6 +142,14 @@ class AddForm(QMainWindow):
             return False, str(e)
 
         return True, None
+
+    def fill_in_data(self, variety: str, roast_degree: int, shape: int, taste_description: str, price: int, value: int):
+        self.variety.setText(variety)
+        self.roast_degree.setCurrentIndex(roast_degree - 1)
+        self.shape.setCurrentIndex(shape)
+        self.taste_description.setPlainText(taste_description)
+        self.price.setText(str(price))
+        self.value.setText(str(value))
 
 
 def except_hook(cls, exception, traceback):

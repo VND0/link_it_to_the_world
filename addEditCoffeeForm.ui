@@ -14,7 +14,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Add new</string>
+   <string>Add/edit</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QLabel" name="label">
@@ -185,14 +185,14 @@
    <widget class="QPushButton" name="submit_btn">
     <property name="geometry">
      <rect>
-      <x>300</x>
+      <x>282</x>
       <y>310</y>
-      <width>113</width>
+      <width>131</width>
       <height>32</height>
      </rect>
     </property>
     <property name="text">
-     <string>Добавить</string>
+     <string>Подтвердить</string>
     </property>
    </widget>
   </widget>
