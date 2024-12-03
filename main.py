@@ -24,6 +24,7 @@ class Coffee(QMainWindow):
             uic.loadUi(f, self)
 
         self.fill_in_table()
+        self.add_row_btn.clicked.connect(self.init_add_form)
 
     def fill_in_table(self):
         tb: QTableWidget = self.coffee_table
@@ -47,6 +48,61 @@ class Coffee(QMainWindow):
 
                     tb.setItem(i, j, QTableWidgetItem(str(value)))
         tb.resizeColumnsToContents()
+
+    def init_add_form(self):
+        form = AddForm(self, self.add_row)
+        form.show()
+
+    def add_row(self, variety: str, roast_deg: int, shape: int, taste_description: str, price: int, value: int) -> None:
+        with sqlite3.connect("coffee.sqlite") as conn:
+            cursor = conn.cursor()
+            query = """
+            INSERT INTO coffee(variety, roast_degree, ground_bean, taste_description, price, value) VALUES
+            (?, ?, ?, ?, ?, ?);
+            """
+            cursor.execute(query,
+                           (variety, roast_deg, shape, taste_description, price, value))
+            conn.commit()
+
+
+class AddForm(QMainWindow):
+    def __init__(self, parent: Coffee, callback: ()):
+        super().__init__(parent)
+        with open("addEditCoffeeForm.ui") as f:
+            uic.loadUi(f, self)
+
+        self.callback = callback
+        self.submit_btn.clicked.connect(self.add_row)
+
+    def add_row(self):
+        variety = self.variety.text().strip()
+        roast_degree = self.roast_degree.currentIndex() + 1
+        shape = self.shape.currentIndex()
+        taste_description = self.taste_description.toPlainText().strip()
+        price = self.price.text().strip()
+        value = self.value.text().strip()
+
+        ok, report = self.validate(variety, taste_description, price, value)
+        if not ok:
+            self.statusBar.showMessage(report)
+            return
+        price = int(price)
+        value = int(value)
+
+        self.callback(variety, roast_degree, shape, taste_description, price, value)
+        self.parent().fill_in_table()
+        self.close()
+
+    def validate(self, variety: str, taste_description: str, price: str, value: str) -> (bool, str | None):
+        try:
+            assert variety, "Строка сорта пуста"
+            assert taste_description, "Описание вкуса не заполнено"
+            assert price.isdigit(), "Цена должна быть целым неотрицательным числом"
+            assert value.isdigit() and int(value) > 0, "Объем должен быть натуральным числом"
+        except AssertionError as e:
+            return False, str(e)
+
+        return True, None
 
 
 def except_hook(cls, exception, traceback):
