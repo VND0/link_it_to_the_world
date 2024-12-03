@@ -1,9 +1,11 @@
 import sqlite3
 import sys
 
-from PyQt6 import uic
 from PyQt6.QtCore import QModelIndex
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem
+
+import add_edit_coffee_form
+import main_window
 
 ROAST_DEGREES = {
     1: "Слабая",
@@ -17,12 +19,10 @@ SHAPES = {
 HORIZONTAL_HEADERS = ["ID", "Сорт", "Степень обжарки", "Молотый/зерновой", "Описание вкуса", "Цена", "Объем упаковки"]
 
 
-class Coffee(QMainWindow):
+class Coffee(QMainWindow, main_window.Ui_MainWindow):
     def __init__(self):
         super().__init__()
-
-        with open("main.ui") as f:
-            uic.loadUi(f, self)
+        self.setupUi(self)
 
         self.fill_in_table()
         self.add_row_btn.clicked.connect(self.init_add_form)
@@ -38,7 +38,7 @@ class Coffee(QMainWindow):
         tb.setHorizontalHeaderLabels(HORIZONTAL_HEADERS)
 
         query = """SELECT * FROM coffee;"""
-        with sqlite3.connect("coffee.sqlite") as conn:
+        with sqlite3.connect("data/coffee.sqlite") as conn:
             cursor = conn.cursor()
             for i, row in enumerate(cursor.execute(query)):
                 tb.setRowCount(tb.rowCount() + 1)
@@ -70,7 +70,7 @@ class Coffee(QMainWindow):
         row_id = int(tb.item(row_index, 0).text())
         form = AddEditForm(self, self.add_row, True, row_id)
 
-        with sqlite3.connect("coffee.sqlite") as conn:
+        with sqlite3.connect("data/coffee.sqlite") as conn:
             cursor = conn.cursor()
             query = """
             SELECT variety, roast_degree, ground_bean, taste_description, price, value
@@ -83,7 +83,7 @@ class Coffee(QMainWindow):
 
     def add_row(self, variety: str, roast_deg: int, shape: int, taste_description: str, price: int, value: int,
                 edit_mode: bool, row_id: int | None) -> None:
-        with sqlite3.connect("coffee.sqlite") as conn:
+        with sqlite3.connect("data/coffee.sqlite") as conn:
             cursor = conn.cursor()
             if edit_mode:
                 query = f"""
@@ -101,11 +101,10 @@ class Coffee(QMainWindow):
             conn.commit()
 
 
-class AddEditForm(QMainWindow):
+class AddEditForm(QMainWindow, add_edit_coffee_form.Ui_MainWindow):
     def __init__(self, parent: Coffee, callback: (), edit_mode: bool = False, row_id: int = None):
         super().__init__(parent)
-        with open("addEditCoffeeForm.ui") as f:
-            uic.loadUi(f, self)
+        self.setupUi(self)
 
         self.row_id = row_id
         self.edit_mode = edit_mode
